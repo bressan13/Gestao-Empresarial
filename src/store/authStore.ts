@@ -1,22 +1,14 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { User, AuthState } from '../types/auth';
+// store/authStore.ts
+import create from 'zustand';
 
-interface AuthStore extends AuthState {
-  login: (user: User) => void;
-  logout: () => void;
+interface AuthState {
+    user: { id: string; nome: string; email: string; cargo: string } | null;
+    setUser: (user: AuthState['user']) => void;
+    isAuthenticated: boolean;
 }
 
-export const useAuthStore = create<AuthStore>()(
-  persist(
-    (set) => ({
-      user: null,
-      isAuthenticated: false,
-      login: (user) => set({ user, isAuthenticated: true }),
-      logout: () => set({ user: null, isAuthenticated: false }),
-    }),
-    {
-      name: 'auth-storage',
-    }
-  )
-);
+export const useAuthStore = create<AuthState>((set) => ({
+    user: null,
+    setUser: (user) => set({ user, isAuthenticated: !!user }),
+    isAuthenticated: false,
+}));

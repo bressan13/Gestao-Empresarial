@@ -7,6 +7,11 @@ import { LogIn } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate, useLocation } from 'react-router-dom';
 
+// Importação do Firebase
+import { auth, googleProvider, signInWithPopup } from '../../config/firebase';
+
+
+
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
   senha: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
@@ -28,16 +33,46 @@ export function LoginForm() {
   });
 
   const onSubmit = (data: LoginForm) => {
-    // Simulando login - em produção, isso seria uma chamada à API
-    login({
-      id: '1',
-      nome: 'Usuário Demo',
-      email: data.email,
-      cargo: 'admin',
-    });
+    // Usando Firebase para autenticação com email e senha
+    auth.signInWithEmailAndPassword(data.email, data.senha)
+      .then((userCredential) => {
+        const user = userCredential.user;
+        login({
+          id: user.uid,
+          nome: user.displayName || 'Usuário',
+          email: user.email || '',
+          cargo: 'admin',
+        });
 
-    const from = location.state?.from?.pathname || '/';
-    navigate(from, { replace: true });
+        const from = location.state?.from?.pathname || '/';
+        navigate(from, { replace: true });
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        console.error(errorCode, errorMessage);
+      });
+  };
+
+  const handleGoogleLogin = () => {
+    signInWithPopup(auth, googleProvider)
+      .then((result) => {
+        const user = result.user;
+        login({
+          id: user.uid,
+          nome: user.displayName || 'Usuário',
+          email: user.email || '',
+          cargo: 'admin',
+        });
+
+        const from = location.state?.from?.pathname || '/';
+        navigate(from, { replace: true });
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        console.error(errorCode, errorMessage);
+      });
   };
 
   return (
@@ -105,6 +140,15 @@ export function LoginForm() {
             </motion.button>
           </div>
         </form>
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full py-2 px-4 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Entrar com Google
+          </button>
+        </div>
       </div>
     </motion.div>
   );
