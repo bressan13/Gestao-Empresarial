@@ -9,8 +9,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 // Importação do Firebase
 import { auth, googleProvider, signInWithPopup } from '../../config/firebase';
-
-
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '../../config/firebase'; // Certifique-se de importar a instância do Firestore
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -35,14 +35,32 @@ export function LoginForm() {
   const onSubmit = (data: LoginForm) => {
     // Usando Firebase para autenticação com email e senha
     auth.signInWithEmailAndPassword(data.email, data.senha)
-      .then((userCredential) => {
+      .then(async (userCredential) => {
         const user = userCredential.user;
+
         login({
           id: user.uid,
           nome: user.displayName || 'Usuário',
           email: user.email || '',
           cargo: 'admin',
         });
+
+        // Verificar se o usuário já tem uma empresa cadastrada
+        const userDocRef = doc(db, 'usuarios', user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const empresaCadastrada = userDoc.data()?.empresa;
+          if (empresaCadastrada) {
+            // Se a empresa já estiver cadastrada, carrega os dados
+            console.log('Empresa cadastrada:', empresaCadastrada);
+          } else {
+            // Se não houver empresa, navegue para a página de cadastro da empresa
+            navigate('/cadastro-empresa');
+          }
+        } else {
+          console.log('Usuário não encontrado');
+        }
 
         const from = location.state?.from?.pathname || '/';
         navigate(from, { replace: true });
@@ -56,7 +74,7 @@ export function LoginForm() {
 
   const handleGoogleLogin = () => {
     signInWithPopup(auth, googleProvider)
-      .then((result) => {
+      .then(async (result) => {
         const user = result.user;
         login({
           id: user.uid,
@@ -64,6 +82,23 @@ export function LoginForm() {
           email: user.email || '',
           cargo: 'admin',
         });
+
+        // Verificar se o usuário já tem uma empresa cadastrada
+        const userDocRef = doc(db, 'usuarios', user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const empresaCadastrada = userDoc.data()?.empresa;
+          if (empresaCadastrada) {
+            // Se a empresa já estiver cadastrada, carrega os dados
+            console.log('Empresa cadastrada:', empresaCadastrada);
+          } else {
+            // Se não houver empresa, navegue para a página de cadastro da empresa
+            navigate('/cadastro-empresa');
+          }
+        } else {
+          console.log('Usuário não encontrado');
+        }
 
         const from = location.state?.from?.pathname || '/';
         navigate(from, { replace: true });
