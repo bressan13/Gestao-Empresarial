@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+// src/App.tsx
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -10,15 +11,19 @@ import { AccessDenied } from './components/Auth/AccessDenied';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { useThemeStore } from './store/themeStore';
 import { useAuthStore } from './store/authStore';
+import { doc, getDoc } from 'firebase/firestore'; // Importar Firestore
+import { db } from './config/firebase'; // Configuração do Firebase
 import Navbar from './components/Navbar'; // Importando a Navbar
-import { onAuthStateChanged } from 'firebase/auth'; // Importando para verificar mudanças no estado de autenticação
-import { auth } from './config/firebase'; // Importando a configuração do Firebase
 
 function App() {
     const isDarkMode = useThemeStore((state) => state.isDarkMode);
-    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-    const setUser = useAuthStore((state) => state.setUser);
+    const { isAuthenticated, user } = useAuthStore((state) => ({
+        isAuthenticated: state.isAuthenticated,
+        user: state.user,
+    }));
+    const [empresaCadastrada, setEmpresaCadastrada] = useState<boolean | null>(null);
 
+    // Aplica tema escuro/claro
     useEffect(() => {
         if (isDarkMode) {
             document.documentElement.classList.add('dark');
@@ -27,48 +32,63 @@ function App() {
         }
     }, [isDarkMode]);
 
-    // Monitorando as mudanças no estado de autenticação do Firebase
+    // Verificar se a empresa está cadastrada
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                setUser({
-                    id: user.uid,
-                    nome: user.displayName || 'Usuário',
-                    email: user.email || '',
-                    cargo: 'admin',
-                });
-            } else {
-                setUser(null); // Limpa o estado se não houver usuário
-            }
-        });
+        const verificarCadastroEmpresa = async () => {
+            if (isAuthenticated && user?.id) {
+                try {
+                    const userDocRef = doc(db, 'usuarios', user.id); // Referência ao documento do usuário
+                    const userDoc = await getDoc(userDocRef);
 
-        return () => unsubscribe(); // Limpa a assinatura quando o componente for desmontado
-    }, [setUser]);
+                    if (userDoc.exists()) {
+                        setEmpresaCadastrada(userDoc.data().empresaCadastrada || false);
+                    } else {
+                        console.error('Documento do usuário não encontrado.');
+                        setEmpresaCadastrada(false); // Assume que não está cadastrada
+                    }
+                } catch (error) {
+                    console.error('Erro ao verificar cadastro da empresa:', error);
+                    setEmpresaCadastrada(false);
+                }
+            } else {
+                setEmpresaCadastrada(false); // Caso não autenticado
+            }
+        };
+
+        verificarCadastroEmpresa();
+    }, [isAuthenticated, user]);
+
+    // Renderizar carregamento até verificar estado
+    if (empresaCadastrada === null) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                Carregando...
+            </div>
+        );
+    }
 
     return (
         <Router>
             <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200`}>
-                {/* Exibindo a Navbar */}
                 <Navbar />
                 {isAuthenticated && <Header />}
                 <Routes>
-                    <Route path="/login" element={
-                        isAuthenticated ? <Navigate to="/" replace /> : <LoginForm />
-                    } />
-                    <Route path="/registro" element={
-                        isAuthenticated ? <Navigate to="/" replace /> : <RegisterForm />
-                    } />
+                    <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginForm />} />
+                    <Route path="/registro" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterForm />} />
                     <Route path="/acesso-negado" element={<AccessDenied />} />
                     <Route
                         path="/"
                         element={
                             <ProtectedRoute>
-                                <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                                    <div className="px-4 py-6 sm:px-0">
-                                        <CadastroEmpresa />
-                                        <Dashboard />
-                                    </div>
-                                </main>
+                                {empresaCadastrada ? <Dashboard /> : <Navigate to="/cadastro-empresa" replace />}
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/cadastro-empresa"
+                        element={
+                            <ProtectedRoute>
+                                <CadastroEmpresa setEmpresaCadastrada={setEmpresaCadastrada} />
                             </ProtectedRoute>
                         }
                     />

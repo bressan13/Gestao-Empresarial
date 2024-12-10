@@ -1,6 +1,6 @@
-// src/firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore'; // Certifique-se de que o Firestore é importado aqui
 
 // Configurações do Firebase
 const firebaseConfig = {
@@ -14,9 +14,13 @@ const firebaseConfig = {
 
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
+
+// Inicializações únicas
 const auth = getAuth(app);
+const db = getFirestore(app); // Certifique-se de que o Firestore está sendo inicializado corretamente
 
 // Provedor do Google para autenticação
 const googleProvider = new GoogleAuthProvider();
 
-export { auth, googleProvider, signInWithPopup, signOut };
+// Exportações
+export { auth, db, googleProvider, signInWithPopup, signOut };
