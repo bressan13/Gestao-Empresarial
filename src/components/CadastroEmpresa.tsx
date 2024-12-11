@@ -18,7 +18,7 @@ const salvarCadastroEmpresa = async (userId: string, data: EmpresaForm) => {
   if (userDoc.exists()) {
     await setDoc(userDocRef, { empresaCadastrada: true, empresa: data }, { merge: true });
   } else {
-    await setDoc(userDocRef, { empresaCadastrada: false, empresa: data });
+    await setDoc(userDocRef, { empresaCadastrada: true, empresa: data });
   }
 };
 
@@ -61,9 +61,12 @@ export function CadastroEmpresa() {
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists() && userDoc.data()?.empresaCadastrada) {
+          console.log('Salvando empresa no Firestore...');
+          await salvarCadastroEmpresa(userId, novaEmpresa);
+          setEmpresa(novaEmpresa);
           addNotificacao({
-            titulo: 'Erro',
-            mensagem: 'Você já cadastrou uma empresa.',
+            titulo: 'Salvo',
+            mensagem: 'Atualizacoes salvas!',
             tipo: 'error',
           });
           return;

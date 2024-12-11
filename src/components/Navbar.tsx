@@ -16,7 +16,7 @@ const Navbar: React.FC = () => {
                     <Link to="/" className="hover:text-gray-300">Dashboard</Link>
                     <Link to="/calendario" className="hover:text-gray-300">Calendário</Link>
                     <Link to="/login" className="hover:text-gray-300">Login</Link>
-                    <Link to="/registro" className="hover:text-gray-300">Registro</Link>
+                    <Link to="/registro" className="hover:text-gray-300">Minha Empresa</Link>
                 </div>
                 {/* Menu Toggle for Mobile */}
                 <button onClick={toggleMenu} className="md:hidden text-white">
@@ -29,7 +29,7 @@ const Navbar: React.FC = () => {
                     <Link to="/" className="hover:text-gray-300">Dashboard</Link>
                     <Link to="/calendario" className="hover:text-gray-300">Calendário</Link>
                     <Link to="/login" className="hover:text-gray-300">Login</Link>
-                    <Link to="/registro" className="hover:text-gray-300">Registro</Link>
+                    <Link to="/registro" className="hover:text-gray-300">Minha Empresa</Link>
                 </div>
             )}
         </nav>
