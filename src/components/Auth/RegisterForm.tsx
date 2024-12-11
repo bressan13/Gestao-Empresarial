@@ -10,6 +10,8 @@ import { auth } from '../../config/firebase';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificacoesStore } from '../../store/notificacoesStore';
 
+
+
 const registerSchema = z.object({
   nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
   email: z.string().email('Email inválido'),
@@ -60,7 +62,7 @@ export function RegisterForm() {
         tipo: 'success',
       });
 
-      navigate('/');
+      navigate('/cadastro-empresa');
     } catch (error: any) {
       addNotificacao({
         titulo: 'Erro no cadastro',

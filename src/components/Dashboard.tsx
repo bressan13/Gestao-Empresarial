@@ -1,38 +1,62 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useEmpresaStore } from '../store/empresaStore';
 import { motion } from 'framer-motion';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 export function Dashboard() {
-  const empresa = useEmpresaStore((state) => state.empresa);
+  const [empresa, setEmpresa] = useState(null); // Estado para armazenar os dados da empresa
+  const [loading, setLoading] = useState(true); // Estado para controle de carregamento
 
-  // Gera dados dos últimos 3 meses baseado nos dados da empresa
+  // Função para buscar os dados da empresa no Firestore
+  const fetchEmpresaData = async () => {
+    setLoading(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, 'usuarios')); 
+      const empresas = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      if (empresas.length > 0) {
+        setEmpresa(empresas[0]);
+      } else {
+        console.warn("Nenhuma empresa encontrada na coleção.");
+        setEmpresa(null);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados da empresa:", error);
+      setEmpresa(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmpresaData();
+  }, []);
+
   const gerarDadosGrafico = () => {
     if (!empresa) return [];
-
     return Array.from({ length: 3 }).map((_, index) => {
       const mes = subMonths(new Date(), 2 - index);
-      const variacao = Math.random() * 0.2 - 0.1; // Variação de ±10%
-
+      const variacao = Math.random() * 0.2 - 0.1;
       return {
         mes: format(mes, 'yyyy-MM'),
         receitas: empresa.faturamentoMensal * (1 + variacao),
         despesas: (empresa.despesasFixas + empresa.despesasVariaveis) * (1 + variacao),
-        lucro: (empresa.faturamentoMensal - (empresa.despesasFixas + empresa.despesasVariaveis)) * (1 + variacao)
+        lucro: (empresa.faturamentoMensal - (empresa.despesasFixas + empresa.despesasVariaveis)) * (1 + variacao),
       };
     });
   };
 
   const dadosGrafico = gerarDadosGrafico();
 
+  if (loading) {
+    return <div className="p-6 text-center text-gray-500"><p>Carregando dados...</p></div>;
+  }
+
   if (!empresa) {
-    return (
-      <div className="p-6 text-center text-gray-500">
-        <p>Cadastre sua empresa para visualizar o dashboard</p>
-      </div>
-    );
+    return <div className="p-6 text-center text-gray-500"><p>Cadastre sua empresa para visualizar o dashboard</p></div>;
   }
 
   return (

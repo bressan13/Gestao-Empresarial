@@ -21,7 +21,8 @@ function App() {
         isAuthenticated: state.isAuthenticated,
         user: state.user,
     }));
-    const [empresaCadastrada, setEmpresaCadastrada] = useState<boolean | null>(null);
+    const [empresaCadastrada, setEmpresaCadastrada] = useState<boolean>(false); // Inicializa como false
+    const [empresa, setEmpresa] = useState<any>(null); // Estado para armazenar os dados da empresa
 
     // Aplica tema escuro/claro
     useEffect(() => {
@@ -41,7 +42,9 @@ function App() {
                     const userDoc = await getDoc(userDocRef);
 
                     if (userDoc.exists()) {
-                        setEmpresaCadastrada(userDoc.data().empresaCadastrada || false);
+                        const empresaData = userDoc.data().empresa;
+                        setEmpresaCadastrada(!!empresaData); // Atualiza o estado com base na presença de dados da empresa
+                        setEmpresa(empresaData || null); // Atualiza com os dados da empresa, ou null se não houver
                     } else {
                         console.error('Documento do usuário não encontrado.');
                         setEmpresaCadastrada(false); // Assume que não está cadastrada
@@ -74,7 +77,7 @@ function App() {
                 {isAuthenticated && <Header />}
                 <Routes>
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginForm />} />
-                    <Route path="/registro" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterForm />} />
+                    <Route path="/registro" element={isAuthenticated ? <Navigate to="/cadastro-empresa" replace /> : <RegisterForm />} />
                     <Route path="/acesso-negado" element={<AccessDenied />} />
                     <Route
                         path="/"
@@ -88,7 +91,10 @@ function App() {
                         path="/cadastro-empresa"
                         element={
                             <ProtectedRoute>
-                                <CadastroEmpresa setEmpresaCadastrada={setEmpresaCadastrada} />
+                                <CadastroEmpresa 
+                                    setEmpresaCadastrada={setEmpresaCadastrada} 
+                                    empresa={empresa} // Passando os dados da empresa para o CadastroEmpresa
+                                />
                             </ProtectedRoute>
                         }
                     />
