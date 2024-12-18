@@ -62,28 +62,29 @@ export function Dashboard() {
       }
     }, []);
  
-  const gerarDadosGrafico = () => {
+    const [dadosGrafico, setDadosGrafico] = useState([]);
+
+    // Atualize os dados do gráfico apenas quando os valores da empresa mudarem
+    useEffect(() => {
+      if (empresa) {
+        const faturamentoMensal = empresa.faturamentoMensal || 0;
+        const despesasFixas = empresa.despesasFixas || 0;
+        const despesasVariaveis = empresa.despesasVariaveis || 0;
     
+        const novosDados = Array.from({ length: 3 }).map((_, index) => {
+          const mes = subMonths(new Date(), 2 - index);
+          return {
+            mes: format(mes, 'yyyy-MM'),
+            receitas: faturamentoMensal,
+            despesas: despesasFixas + despesasVariaveis,
+            lucro: faturamentoMensal - (despesasFixas + despesasVariaveis),
+          };
+        });
     
-    if (!empresa) return [];
+        setDadosGrafico(novosDados);
+      }
+    }, [empresa]); // Reexecuta apenas quando os valores da empresa mudam
     
-    const faturamentoMensal = empresa.faturamentoMensal || 0;
-    const despesasFixas = empresa.despesasFixas || 0;
-    const despesasVariaveis = empresa.despesasVariaveis || 0;
-  
-    return Array.from({ length: 3 }).map((_, index) => {
-      const mes = subMonths(new Date(), 2 - index);
-      const variacao = Math.random() * 0.2 - 0.1; // Aqui você pode ajustar a lógica para refletir dados reais
-      return {
-        mes: format(mes, 'yyyy-MM'),
-        receitas: faturamentoMensal * (1 + variacao), 
-        despesas: (despesasFixas + despesasVariaveis) * (1 + variacao),
-        lucro: (faturamentoMensal - (despesasFixas + despesasVariaveis)) * (1 + variacao),
-      };
-    });
-  };
-  
-  const dadosGrafico = gerarDadosGrafico();
 
   // Verifica se todos os dados estão disponíveis para o gráfico e exibe uma mensagem caso contrário
   if (loading) {
@@ -195,9 +196,7 @@ export function Dashboard() {
     </motion.div>
   );
 }
-function setEmpresaExistente(arg0: boolean) {
-  throw new Error('Function not implemented.');
-}
+
 
 function setValue(arg0: string, nome: any) {
   throw new Error('Function not implemented.');
