@@ -29,7 +29,7 @@ export function NotificacoesMenu() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg z-500"
+            className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg z-[9999]"
           >
             <div className="p-4">
               <h3 className="text-lg font-semibold mb-4">Notificações</h3>

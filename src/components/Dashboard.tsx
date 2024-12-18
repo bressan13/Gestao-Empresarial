@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { format, subMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
@@ -10,8 +10,7 @@ import { getAuth } from 'firebase/auth';
 export function Dashboard() {
   const [empresa, setEmpresa] = useState(null); 
   const [loading, setLoading] = useState(true);
-  
-  
+  const [dadosGrafico, setDadosGrafico] = useState([]);
 
   useEffect(() => {
       const user = getAuth().currentUser;
@@ -28,7 +27,6 @@ export function Dashboard() {
               console.log("Dados do documento do usuário:", userDoc.data());
               const empresa = userDoc.data()?.empresa;
               if (empresa) {
-                
                 console.log("Empresa encontrada:", empresa);
                 setEmpresa({
                   nome: empresa.nome,
@@ -38,11 +36,6 @@ export function Dashboard() {
                   despesasFixas: empresa.despesasFixas,
                   despesasVariaveis: empresa.despesasVariaveis,
                 });
-                
-  
-                if (empresa.segmento === 'outro') {
-                  setValue('segmentoPersonalizado', empresa.segmentoPersonalizado);
-                }
               } else {
                 console.log("Nenhuma empresa encontrada para esse usuário.");
               }
@@ -60,31 +53,29 @@ export function Dashboard() {
       } else {
         console.log("Usuário não autenticado.");
       }
-    }, []);
- 
-    const [dadosGrafico, setDadosGrafico] = useState([]);
+  }, []);
 
-    // Atualize os dados do gráfico apenas quando os valores da empresa mudarem
-    useEffect(() => {
-      if (empresa) {
-        const faturamentoMensal = empresa.faturamentoMensal || 0;
-        const despesasFixas = empresa.despesasFixas || 0;
-        const despesasVariaveis = empresa.despesasVariaveis || 0;
-    
-        const novosDados = Array.from({ length: 3 }).map((_, index) => {
-          const mes = subMonths(new Date(), 2 - index);
-          return {
-            mes: format(mes, 'yyyy-MM'),
-            receitas: faturamentoMensal,
-            despesas: despesasFixas + despesasVariaveis,
-            lucro: faturamentoMensal - (despesasFixas + despesasVariaveis),
-          };
-        });
-    
-        setDadosGrafico(novosDados);
-      }
-    }, [empresa]); // Reexecuta apenas quando os valores da empresa mudam
-    
+  // Atualiza os dados do gráfico apenas para o mês atual
+  useEffect(() => {
+    if (empresa) {
+      const faturamentoMensal = empresa.faturamentoMensal || 0;
+      const despesasFixas = empresa.despesasFixas || 0;
+      const despesasVariaveis = empresa.despesasVariaveis || 0;
+  
+      // Filtra para mostrar somente os dados do mês atual
+      const mesAtual = new Date();
+      const novosDados = [
+        {
+          mes: format(mesAtual, 'yyyy-MM'),
+          receitas: faturamentoMensal,
+          despesas: despesasFixas + despesasVariaveis,
+          lucro: faturamentoMensal - (despesasFixas + despesasVariaveis),
+        }
+      ];
+  
+      setDadosGrafico(novosDados);
+    }
+  }, [empresa]);
 
   // Verifica se todos os dados estão disponíveis para o gráfico e exibe uma mensagem caso contrário
   if (loading) {
@@ -96,7 +87,6 @@ export function Dashboard() {
       <p>Dados da empresa estão incompletos. Verifique os campos no banco de dados.</p>
     </div>;
   }
-
 
   return (
     <motion.div 
@@ -196,9 +186,3 @@ export function Dashboard() {
     </motion.div>
   );
 }
-
-
-function setValue(arg0: string, nome: any) {
-  throw new Error('Function not implemented.');
-}
-

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,9 +8,10 @@ import { useAuthStore } from '../../store/authStore';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // Importação do Firebase
-import { auth, googleProvider, signInWithPopup } from '../../config/firebase';
+import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword } from '../../config/firebase';
 import { getDoc, doc } from 'firebase/firestore';
-import { db } from '../../config/firebase'; // Certifique-se de importar a instância do Firestore
+import { db } from '../../config/firebase'; 
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -19,11 +20,55 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+export function RegisterForm() {
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
+      const user = userCredential.user;
+      console.log('Usuário registrado:', user);
+    } catch (error) {
+      console.error('Erro no registro:', error);
+      setError('Erro ao criar conta. Tente novamente.');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        required
+      />
+      <input
+        type="password"
+        value={senha}
+        onChange={(e) => setSenha(e.target.value)}
+        placeholder="Senha"
+        required
+        minLength={6}
+      />
+      {error && <p>{error}</p>}
+      <button type="submit">Cadastrar</button>
+    </form>
+  );
+}
+
 export function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const login = useAuthStore((state) => state.login);
   
+  // Estado para armazenar a mensagem de erro
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -33,8 +78,11 @@ export function LoginForm() {
   });
 
   const onSubmit = (data: LoginForm) => {
+    // Resetando a mensagem de erro antes de tentar o login
+    setErrorMessage(null);
+
     // Usando Firebase para autenticação com email e senha
-    auth.signInWithEmailAndPassword(data.email, data.senha)
+    signInWithEmailAndPassword(auth, data.email, data.senha)
       .then(async (userCredential) => {
         const user = userCredential.user;
 
@@ -69,6 +117,15 @@ export function LoginForm() {
         const errorCode = error.code;
         const errorMessage = error.message;
         console.error(errorCode, errorMessage);
+
+        // Exibir mensagem de erro personalizada
+        if (errorCode === 'auth/wrong-password') {
+          setErrorMessage('Senha incorreta.');
+        } else if (errorCode === 'auth/user-not-found') {
+          setErrorMessage('Usuário não encontrado.');
+        } else {
+          setErrorMessage('Erro desconhecido. Tente novamente.');
+        }
       });
   };
 
@@ -163,6 +220,13 @@ export function LoginForm() {
               )}
             </div>
           </div>
+
+          {/* Exibe a mensagem de erro se existir */}
+          {errorMessage && (
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+              {errorMessage}
+            </p>
+          )}
 
           <div>
             <motion.button
