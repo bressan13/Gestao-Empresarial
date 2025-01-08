@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 import { doc, getDoc } from 'firebase/firestore';
@@ -77,33 +77,56 @@ export function Dashboard() {
         const start = startOfWeek(semanaSelecionada, { weekStartsOn: 0 });
         const end = endOfWeek(semanaSelecionada, { weekStartsOn: 0 });
 
-        // Buscando os dados financeiros semanais
+        // Agrupando os dados por data
         const faturamentoSemanal = empresa.financeiro.faturamento || [];
         const despesasFixasSemanal = empresa.financeiro.despesasFixas || [];
         const despesasVariaveisSemanal = empresa.financeiro.despesasVariaveis || [];
 
-        // Verificando se os dados estão sendo filtrados corretamente pela semana
+        // Mapeando as entradas de faturamento por data
+        const agrupadoPorData = {};
+
         faturamentoSemanal.forEach((item) => {
-          const data = parseISO(item.data); // Convertendo data de string para Date
-          console.log('Faturamento:', item); // Verificar os dados de faturamento
-          if (isWithinInterval(data, { start, end })) {
-            console.log('Faturamento dentro do intervalo:', item);
-            console.log('Intervalo:', start, end);
-            console.log('Data:', data);
-
-            const despesasFixasSemana = despesasFixasSemanal.find(d => isWithinInterval(parseISO(d.data), { start, end }))?.valor || 0;
-            const despesasVariaveisSemana = despesasVariaveisSemanal.find(d => isWithinInterval(parseISO(d.data), { start, end }))?.valor || 0;
-            
-            console.log('Despesas Fixas:', despesasFixasSemana);
-            console.log('Despesas Variáveis:', despesasVariaveisSemana);
-
-            dados.push({
-              mes: format(data, 'dd/MM/yyyy'),  // A data no gráfico será exibida corretamente no formato dd/MM/yyyy
-              receitas: item.valor,
-              despesas: despesasFixasSemana + despesasVariaveisSemana,
-              lucro: item.valor - (despesasFixasSemana + despesasVariaveisSemana),
-            });
+          const data = parseISO(item.data); // Convertendo data para Date
+          if (isSameDay(data, start) || isSameDay(data, end) || (data >= start && data <= end)) {
+            if (!agrupadoPorData[data]) {
+              agrupadoPorData[data] = { receitas: 0, despesas: 0 };
+            }
+            agrupadoPorData[data].receitas += item.valor;
           }
+        });
+
+        // Mapeando as despesas por data
+        despesasFixasSemanal.forEach((item) => {
+          const data = parseISO(item.data);
+          if (isSameDay(data, start) || isSameDay(data, end) || (data >= start && data <= end)) {
+            if (!agrupadoPorData[data]) {
+              agrupadoPorData[data] = { receitas: 0, despesas: 0 };
+            }
+            agrupadoPorData[data].despesas += item.valor;
+          }
+        });
+
+        despesasVariaveisSemanal.forEach((item) => {
+          const data = parseISO(item.data);
+          if (isSameDay(data, start) || isSameDay(data, end) || (data >= start && data <= end)) {
+            if (!agrupadoPorData[data]) {
+              agrupadoPorData[data] = { receitas: 0, despesas: 0 };
+            }
+            agrupadoPorData[data].despesas += item.valor;
+          }
+        });
+
+        // Convertendo para o formato desejado para o gráfico
+        Object.keys(agrupadoPorData).forEach((dataKey) => {
+          const data = new Date(dataKey);
+          const totalReceitas = agrupadoPorData[dataKey].receitas;
+          const totalDespesas = agrupadoPorData[dataKey].despesas;
+          dados.push({
+            mes: format(data, 'dd/MM/yyyy'), // Exibindo a data no gráfico
+            receitas: totalReceitas,
+            despesas: totalDespesas,
+            lucro: totalReceitas - totalDespesas,
+          });
         });
       }
 
@@ -177,28 +200,34 @@ export function Dashboard() {
         className="bg-white p-6 rounded-lg shadow-md"
       >
         <h3 className="text-lg font-semibold text-gray-700 mb-4">Desempenho Financeiro</h3>
-        <div className="h-[400px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart key={JSON.stringify(dadosGrafico)} data={dadosGrafico}>  {/* Adicionando key para forçar re-renderização */}
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="mes" 
-                tickFormatter={(value) => format(new Date(value), visualizacao === 'semanal' ? 'dd/MM/yyyy' : 'MMM/yyyy', { locale: ptBR })}
-              />
-              <YAxis 
-                tickFormatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(value)}
-              />
-              <Tooltip 
-                formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
-                labelFormatter={(label) => format(new Date(label), 'MMMM/yyyy', { locale: ptBR })}
-              />
-              <Legend />
-              <Bar dataKey="receitas" name="Receitas" fill="#10B981" />
-              <Bar dataKey="despesas" name="Despesas" fill="#EF4444" />
-              <Bar dataKey="lucro" name="Lucro" fill="#3B82F6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+
+        {/* Verificação se há dados para o gráfico */}
+        {dadosGrafico.length > 0 ? (
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart key={JSON.stringify(dadosGrafico)} data={dadosGrafico}>  {/* Adicionando key para forçar re-renderização */}
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="mes" 
+                  tickFormatter={(value) => format(new Date(value), visualizacao === 'semanal' ? 'dd/MM/yyyy' : 'MMM/yyyy', { locale: ptBR })}
+                />
+                <YAxis 
+                  tickFormatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(value)}
+                />
+                <Tooltip 
+                  formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
+                  labelFormatter={(label) => format(new Date(label), 'MMMM/yyyy', { locale: ptBR })}
+                />
+                <Legend />
+                <Bar dataKey="receitas" name="Receitas" fill="#10B981" />
+                <Bar dataKey="despesas" name="Despesas" fill="#EF4444" />
+                <Bar dataKey="lucro" name="Lucro" fill="#3B82F6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="text-center text-gray-500">Nenhum dado disponível para o gráfico.</div>
+        )}
       </motion.div>
     </motion.div>
   );
