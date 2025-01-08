@@ -3,66 +3,72 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion } from 'framer-motion';
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { getAuth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { DatePicker } from 'antd';
 
 export function Dashboard() {
-  const [empresa, setEmpresa] = useState(null); 
+  const [empresa, setEmpresa] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dadosGrafico, setDadosGrafico] = useState([]);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-      const user = getAuth().currentUser;
-      if (user) {
-        const userId = user.uid;
-  
-        const fetchEmpresa = async () => {
-          try {
-            console.log("Buscando dados da empresa...");
-            const userDocRef = doc(db, 'usuarios', userId);
-            const userDoc = await getDoc(userDocRef);
-  
-            if (userDoc.exists()) {
-              console.log("Dados do documento do usuário:", userDoc.data());
-              const empresa = userDoc.data()?.empresa;
-              if (empresa) {
-                console.log("Empresa encontrada:", empresa);
-                setEmpresa({
-                  nome: empresa.nome,
-                  cnpj: empresa.cnpj,
-                  segmento: empresa.segmento,
-                  faturamentoMensal: empresa.faturamentoMensal,
-                  despesasFixas: empresa.despesasFixas,
-                  despesasVariaveis: empresa.despesasVariaveis,
-                });
-              } else {
-                console.log("Nenhuma empresa encontrada para esse usuário.");
-              }
-            } else {
-              console.log("Usuário não tem empresa cadastrada.");
-            }
-          } catch (error) {
-            console.error('Erro ao carregar dados da empresa', error);
-          } finally {
-            setLoading(false);
-          }
-        };
-  
-        fetchEmpresa();
+    const auth = getAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        console.log('Usuário autenticado:', currentUser);
+        setUser(currentUser);
+        await fetchEmpresaData(currentUser.uid);
       } else {
-        console.log("Usuário não autenticado.");
+        console.log('Nenhum usuário autenticado.');
+        setUser(null);
+        setLoading(false);
       }
+    });
+
+    return () => unsubscribe(); // Limpeza do listener ao desmontar o componente
   }, []);
 
-  // Atualiza os dados do gráfico apenas para o mês atual
+  const fetchEmpresaData = async (userId) => {
+    try {
+      console.log("Buscando dados da empresa para o usuário:", userId);
+      const userDocRef = doc(db, 'usuarios', userId);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const empresaData = userDoc.data()?.empresa;
+        if (empresaData) {
+          console.log("Empresa encontrada:", empresaData);
+          setEmpresa({
+            nome: empresaData.nome,
+            cnpj: empresaData.cnpj,
+            segmento: empresaData.segmento,
+            faturamentoMensal: empresaData.faturamentoMensal,
+            despesasFixas: empresaData.despesasFixas,
+            despesasVariaveis: empresaData.despesasVariaveis,
+          });
+        } else {
+          console.log("Nenhuma empresa vinculada ao usuário.");
+        }
+      } else {
+        console.log("Documento do usuário não encontrado no Firestore.");
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados da empresa:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (empresa) {
       const faturamentoMensal = empresa.faturamentoMensal || 0;
       const despesasFixas = empresa.despesasFixas || 0;
       const despesasVariaveis = empresa.despesasVariaveis || 0;
-  
-      // Filtra para mostrar somente os dados do mês atual
+
       const mesAtual = new Date();
       const novosDados = [
         {
@@ -70,22 +76,23 @@ export function Dashboard() {
           receitas: faturamentoMensal,
           despesas: despesasFixas + despesasVariaveis,
           lucro: faturamentoMensal - (despesasFixas + despesasVariaveis),
-        }
+        },
       ];
-  
+
       setDadosGrafico(novosDados);
     }
   }, [empresa]);
 
-  // Verifica se todos os dados estão disponíveis para o gráfico e exibe uma mensagem caso contrário
   if (loading) {
-    return <div className="p-6 text-center text-gray-500"><p>Carregando dados...</p></div>;
+    return <div className="p-6 text-center text-gray-500">Carregando dados...</div>;
   }
 
-  if (!empresa || Object.keys(empresa).length === 0 || !empresa.faturamentoMensal) {
-    return <div className="p-6 text-center text-gray-500">
-      <p>Dados da empresa estão incompletos. Verifique os campos no banco de dados.</p>
-    </div>;
+  if (!user) {
+    return <div className="p-6 text-center text-gray-500">Você não está autenticado. Faça login para continuar.</div>;
+  }
+
+  if (!empresa || Object.keys(empresa).length === 0) {
+    return <div className="p-6 text-center text-gray-500">Nenhuma empresa encontrada para este usuário.</div>;
   }
 
   return (
@@ -96,8 +103,8 @@ export function Dashboard() {
       className="p-6"
     >
       <h2 className="text-2xl font-bold mb-6">Dashboard Financeiro - {empresa.nome}</h2>
-      
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Receita Mensal */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -106,11 +113,11 @@ export function Dashboard() {
         >
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Receita Mensal</h3>
           <p className="text-3xl font-bold text-green-600">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-              .format(empresa.faturamentoMensal)}
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresa.faturamentoMensal)}
           </p>
         </motion.div>
-        
+
+        {/* Despesas Totais */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -119,15 +126,11 @@ export function Dashboard() {
         >
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Despesas Totais</h3>
           <p className="text-3xl font-bold text-red-600">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-              .format(empresa.despesasFixas + empresa.despesasVariaveis)}
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresa.despesasFixas + empresa.despesasVariaveis)}
           </p>
-          <div className="mt-2 text-sm">
-            <p className="text-gray-600">Fixas: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresa.despesasFixas)}</p>
-            <p className="text-gray-600">Variáveis: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresa.despesasVariaveis)}</p>
-          </div>
         </motion.div>
-        
+
+        {/* Lucro Líquido */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -136,15 +139,12 @@ export function Dashboard() {
         >
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Lucro Líquido</h3>
           <p className="text-3xl font-bold text-blue-600">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-              .format(empresa.faturamentoMensal - (empresa.despesasFixas + empresa.despesasVariaveis))}
-          </p>
-          <p className="text-sm text-gray-600 mt-2">
-            Margem: {((empresa.faturamentoMensal - (empresa.despesasFixas + empresa.despesasVariaveis)) / empresa.faturamentoMensal * 100).toFixed(1)}%
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresa.faturamentoMensal - (empresa.despesasFixas + empresa.despesasVariaveis))}
           </p>
         </motion.div>
       </div>
 
+      {/* Gráfico de Desempenho Financeiro */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -161,18 +161,10 @@ export function Dashboard() {
                 tickFormatter={(value) => format(new Date(value), 'MMM/yyyy', { locale: ptBR })}
               />
               <YAxis 
-                tickFormatter={(value) => new Intl.NumberFormat('pt-BR', { 
-                  style: 'currency', 
-                  currency: 'BRL',
-                  notation: 'compact',
-                  maximumFractionDigits: 1
-                }).format(value)}
+                tickFormatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(value)}
               />
               <Tooltip 
-                formatter={(value) => new Intl.NumberFormat('pt-BR', { 
-                  style: 'currency', 
-                  currency: 'BRL' 
-                }).format(value)}
+                formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
                 labelFormatter={(label) => format(new Date(label), 'MMMM/yyyy', { locale: ptBR })}
               />
               <Legend />

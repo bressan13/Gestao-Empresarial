@@ -76,6 +76,7 @@ function App() {
                 <Navbar />
                 {isAuthenticated && <Header />}
                 <Routes>
+                    <Route path="/" element={<Dashboard />} />
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginForm />} />
                     <Route path="/registro" element={isAuthenticated ? <Navigate to="/cadastro-empresa" replace /> : <RegisterForm />} />
                     <Route path="/acesso-negado" element={<AccessDenied />} />
