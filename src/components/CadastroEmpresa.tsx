@@ -67,8 +67,20 @@ export function CadastroEmpresa() {
         let empresaData = userDoc.exists() ? userDoc.data()?.empresa : {};
 
         if (!empresaData) {
-          // Se a empresa não existe, inicialize os dados
-          empresaData = { financeiro: { faturamento: [], despesasFixas: [], despesasVariaveis: [] } };
+          // Inicialize a estrutura de dados caso a empresa não exista
+          empresaData = {
+            financeiro: {
+              faturamento: [],
+              despesasFixas: [],
+              despesasVariaveis: []
+            }
+          };
+        } else {
+          // Certifique-se de que as listas existam e estejam vazias se não houver dados anteriores
+          empresaData.financeiro = empresaData.financeiro || {};
+          empresaData.financeiro.faturamento = empresaData.financeiro.faturamento || [];
+          empresaData.financeiro.despesasFixas = empresaData.financeiro.despesasFixas || [];
+          empresaData.financeiro.despesasVariaveis = empresaData.financeiro.despesasVariaveis || [];
         }
 
         // Adicionar novo dado à lista semanal
