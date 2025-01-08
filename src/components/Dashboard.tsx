@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 import { doc, getDoc } from 'firebase/firestore';
@@ -13,35 +13,33 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [dadosGrafico, setDadosGrafico] = useState([]);
   const [user, setUser] = useState(null);
+  const [visualizacao, setVisualizacao] = useState<'semanal' | 'mensal'>('mensal');
+  const [semanaSelecionada, setSemanaSelecionada] = useState<Date | null>(null);
 
   useEffect(() => {
     const auth = getAuth();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        console.log('Usuário autenticado:', currentUser);
         setUser(currentUser);
         await fetchEmpresaData(currentUser.uid);
       } else {
-        console.log('Nenhum usuário autenticado.');
         setUser(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe(); // Limpeza do listener ao desmontar o componente
+    return () => unsubscribe();
   }, []);
 
   const fetchEmpresaData = async (userId) => {
     try {
-      console.log("Buscando dados da empresa para o usuário:", userId);
       const userDocRef = doc(db, 'usuarios', userId);
       const userDoc = await getDoc(userDocRef);
 
       if (userDoc.exists()) {
         const empresaData = userDoc.data()?.empresa;
         if (empresaData) {
-          console.log("Empresa encontrada:", empresaData);
           setEmpresa({
             nome: empresaData.nome,
             cnpj: empresaData.cnpj,
@@ -49,12 +47,9 @@ export function Dashboard() {
             faturamentoMensal: empresaData.faturamentoMensal,
             despesasFixas: empresaData.despesasFixas,
             despesasVariaveis: empresaData.despesasVariaveis,
+            financeiro: empresaData.financeiro || {} // Garantindo que o campo financeiro esteja presente
           });
-        } else {
-          console.log("Nenhuma empresa vinculada ao usuário.");
         }
-      } else {
-        console.log("Documento do usuário não encontrado no Firestore.");
       }
     } catch (error) {
       console.error('Erro ao carregar dados da empresa:', error);
@@ -65,23 +60,64 @@ export function Dashboard() {
 
   useEffect(() => {
     if (empresa) {
+      const dados = [];
       const faturamentoMensal = empresa.faturamentoMensal || 0;
       const despesasFixas = empresa.despesasFixas || 0;
       const despesasVariaveis = empresa.despesasVariaveis || 0;
 
-      const mesAtual = new Date();
-      const novosDados = [
-        {
+      if (visualizacao === 'mensal') {
+        const mesAtual = new Date();
+        dados.push({
           mes: format(mesAtual, 'yyyy-MM'),
           receitas: faturamentoMensal,
           despesas: despesasFixas + despesasVariaveis,
           lucro: faturamentoMensal - (despesasFixas + despesasVariaveis),
-        },
-      ];
+        });
+      } else if (visualizacao === 'semanal' && semanaSelecionada) {
+        const start = startOfWeek(semanaSelecionada, { weekStartsOn: 0 });
+        const end = endOfWeek(semanaSelecionada, { weekStartsOn: 0 });
 
-      setDadosGrafico(novosDados);
+        // Buscando os dados financeiros semanais
+        const faturamentoSemanal = empresa.financeiro.faturamento || [];
+        const despesasFixasSemanal = empresa.financeiro.despesasFixas || [];
+        const despesasVariaveisSemanal = empresa.financeiro.despesasVariaveis || [];
+
+        // Verificando se os dados estão sendo filtrados corretamente pela semana
+        faturamentoSemanal.forEach((item) => {
+          const data = parseISO(item.data); // Convertendo data de string para Date
+          console.log('Faturamento:', item); // Verificar os dados de faturamento
+          if (isWithinInterval(data, { start, end })) {
+            console.log('Faturamento dentro do intervalo:', item);
+            console.log('Intervalo:', start, end);
+            console.log('Data:', data);
+
+            const despesasFixasSemana = despesasFixasSemanal.find(d => isWithinInterval(parseISO(d.data), { start, end }))?.valor || 0;
+            const despesasVariaveisSemana = despesasVariaveisSemanal.find(d => isWithinInterval(parseISO(d.data), { start, end }))?.valor || 0;
+            
+            console.log('Despesas Fixas:', despesasFixasSemana);
+            console.log('Despesas Variáveis:', despesasVariaveisSemana);
+
+            dados.push({
+              mes: format(data, 'dd/MM/yyyy'),  // A data no gráfico será exibida corretamente no formato dd/MM/yyyy
+              receitas: item.valor,
+              despesas: despesasFixasSemana + despesasVariaveisSemana,
+              lucro: item.valor - (despesasFixasSemana + despesasVariaveisSemana),
+            });
+          }
+        });
+      }
+
+      setDadosGrafico(dados);
     }
-  }, [empresa]);
+  }, [empresa, visualizacao, semanaSelecionada]);
+
+  const handleSemanaChange = (date: Date | null) => {
+    setSemanaSelecionada(date);
+  };
+
+  const handleVisualizacaoChange = (value: 'semanal' | 'mensal') => {
+    setVisualizacao(value);
+  };
 
   if (loading) {
     return <div className="p-6 text-center text-gray-500">Carregando dados...</div>;
@@ -103,46 +139,35 @@ export function Dashboard() {
       className="p-6"
     >
       <h2 className="text-2xl font-bold mb-6">Dashboard Financeiro - {empresa.nome}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Receita Mensal */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white p-6 rounded-lg shadow-md"
-        >
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">Receita Mensal</h3>
-          <p className="text-3xl font-bold text-green-600">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresa.faturamentoMensal)}
-          </p>
-        </motion.div>
 
-        {/* Despesas Totais */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-white p-6 rounded-lg shadow-md"
+      {/* Seletor de visualização */}
+      <div className="mb-6">
+        <button
+          className={`px-4 py-2 mr-4 ${visualizacao === 'mensal' ? 'bg-indigo-500 text-white' : 'bg-gray-200'}`}
+          onClick={() => handleVisualizacaoChange('mensal')}
         >
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">Despesas Totais</h3>
-          <p className="text-3xl font-bold text-red-600">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresa.despesasFixas + empresa.despesasVariaveis)}
-          </p>
-        </motion.div>
-
-        {/* Lucro Líquido */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white p-6 rounded-lg shadow-md"
+          Visualizar Mensal
+        </button>
+        <button
+          className={`px-4 py-2 ${visualizacao === 'semanal' ? 'bg-indigo-500 text-white' : 'bg-gray-200'}`}
+          onClick={() => handleVisualizacaoChange('semanal')}
         >
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">Lucro Líquido</h3>
-          <p className="text-3xl font-bold text-blue-600">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresa.faturamentoMensal - (empresa.despesasFixas + empresa.despesasVariaveis))}
-          </p>
-        </motion.div>
+          Visualizar Semanal
+        </button>
       </div>
+
+      {/* Seletor de semana */}
+      {visualizacao === 'semanal' && (
+        <div className="mb-6">
+          <DatePicker
+            value={semanaSelecionada}
+            onChange={handleSemanaChange}
+            picker="week"
+            locale="pt-BR"
+            format="DD/MM/YYYY"
+          />
+        </div>
+      )}
 
       {/* Gráfico de Desempenho Financeiro */}
       <motion.div 
@@ -154,11 +179,11 @@ export function Dashboard() {
         <h3 className="text-lg font-semibold text-gray-700 mb-4">Desempenho Financeiro</h3>
         <div className="h-[400px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dadosGrafico}>
+            <BarChart key={JSON.stringify(dadosGrafico)} data={dadosGrafico}>  {/* Adicionando key para forçar re-renderização */}
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
                 dataKey="mes" 
-                tickFormatter={(value) => format(new Date(value), 'MMM/yyyy', { locale: ptBR })}
+                tickFormatter={(value) => format(new Date(value), visualizacao === 'semanal' ? 'dd/MM/yyyy' : 'MMM/yyyy', { locale: ptBR })}
               />
               <YAxis 
                 tickFormatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(value)}

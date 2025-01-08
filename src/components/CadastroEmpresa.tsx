@@ -83,7 +83,7 @@ export function CadastroEmpresa() {
           empresaData.financeiro.despesasVariaveis = empresaData.financeiro.despesasVariaveis || [];
         }
 
-        // Adicionar novo dado à lista semanal
+        // Adicionar novo dado à lista diária
         empresaData.financeiro.faturamento.push({ valor: data.faturamentoMensal, data: currentDate });
         empresaData.financeiro.despesasFixas.push({ valor: data.despesasFixas, data: currentDate });
         empresaData.financeiro.despesasVariaveis.push({ valor: data.despesasVariaveis, data: currentDate });
@@ -115,6 +115,11 @@ export function CadastroEmpresa() {
       <h2 className="text-2xl font-semibold mb-4">
         {empresaExistente ? 'Atualizar Dados da Empresa' : 'Cadastrar Nova Empresa'}
       </h2>
+
+      <p className="text-sm text-gray-600 mb-6">
+        Este formulário está registrando os dados financeiros de hoje. Por favor, insira as informações abaixo para o dia atual.
+      </p>
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
           <label className="block text-sm font-medium">Nome da Empresa</label>
@@ -135,7 +140,7 @@ export function CadastroEmpresa() {
           {errors.cnpj && <p className="text-red-600">{errors.cnpj.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium">Faturamento Mensal</label>
+          <label className="block text-sm font-medium">Faturamento</label>
           <input
             {...register('faturamentoMensal', { valueAsNumber: true })}
             type="number"
@@ -162,7 +167,7 @@ export function CadastroEmpresa() {
           {errors.despesasVariaveis && <p className="text-red-600">{errors.despesasVariaveis.message}</p>}
         </div>
         <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg">
-          {empresaExistente ? 'Atualizar Dados' : 'Salvar'}
+          {empresaExistente ? 'Salvar Dados do Dia' : 'Atualizar Dados'}
         </button>
       </form>
     </motion.div>
