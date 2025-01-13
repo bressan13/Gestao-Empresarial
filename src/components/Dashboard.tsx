@@ -205,7 +205,7 @@ export function Dashboard() {
         {dadosGrafico.length > 0 ? (
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart key={JSON.stringify(dadosGrafico)} data={dadosGrafico}>  {/* Adicionando key para forçar re-renderização */}
+              <BarChart key={JSON.stringify(dadosGrafico)} data={dadosGrafico}>  {}
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="mes" 

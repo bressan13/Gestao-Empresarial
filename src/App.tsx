@@ -13,7 +13,7 @@ import { useThemeStore } from './store/themeStore';
 import { useAuthStore } from './store/authStore';
 import { doc, getDoc } from 'firebase/firestore'; // Importar Firestore
 import { db } from './config/firebase'; // Configuração do Firebase
-import Navbar from './components/Navbar'; // Importando a Navbar
+
 
 function App() {
     const isDarkMode = useThemeStore((state) => state.isDarkMode);
@@ -73,8 +73,8 @@ function App() {
     return (
         <Router>
             <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200`}>
-                <Navbar />
-                {isAuthenticated && <Header />}
+                
+                <Header />
                 <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginForm />} />
